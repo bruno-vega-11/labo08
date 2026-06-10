@@ -211,13 +211,16 @@ Body* Parser::parseBody() {
     // Un body termina cuando llega endif/endwhile/endfun/else/END.
     auto isBodyTerminator = [&]() {
         return check(Token::ENDIF)   || check(Token::ENDWHILE) ||
-               check(Token::ENDFUN)  || check(Token::ELSE)     || isAtEnd();
+               check(Token::ENDFUN)  || check(Token::ELSE)     ||
+               check(Token::DOWHILE) || check(Token::CASE)     ||
+               check(Token::DEFAULT) || check(Token::ENDSWITCH) ||
+               isAtEnd();
     };
 
     auto isStmStart = [&]() {
         return check(Token::ID)     || check(Token::PRINT)  ||
                check(Token::RETURN) || check(Token::IF)     ||
-               check(Token::WHILE) || check(Token::DOWHILE) ||
+               check(Token::WHILE) || check(Token::DO)      ||
                check(Token::BREAK)  || check(Token::SWITCH);
     };
 
@@ -256,14 +259,14 @@ Stm* Parser::parseStm() {
         std::string variable = previous->text;
         if (!match(Token::ASSIGN))
             error("'=' después del identificador '" + variable + "'");
-        Exp* e = parseCE();
+        Exp* e = parseOE();
         return new AssignStm(variable, e);
     }
 
     // ---- Print: 'print' '(' Exp ')' ----
     if (match(Token::PRINT)) {
         expect(Token::LPAREN);
-        Exp* e = parseCE();
+        Exp* e = parseOE();
         expect(Token::RPAREN);
         return new PrintStm(e);
     }
@@ -272,14 +275,14 @@ Stm* Parser::parseStm() {
     if (match(Token::RETURN)) {
         ReturnStm* r = new ReturnStm();
         expect(Token::LPAREN);
-        r->e = parseCE();
+        r->e = parseOE();
         expect(Token::RPAREN);
         return r;
     }
 
     // ---- If: 'if' CE 'then' Body ('else' Body)? 'endif' ----
     if (match(Token::IF)) {
-        Exp*  cond = parseCE();
+        Exp*  cond = parseOE();
         Body* tb   = nullptr;
         Body* fb   = nullptr;
 
@@ -298,7 +301,7 @@ Stm* Parser::parseStm() {
 
     // ---- While: 'while' CE 'do' Body 'endwhile' ----
     if (match(Token::WHILE)) {
-        Exp* cond = parseCE();
+        Exp* cond = parseOE();
 
         if (!match(Token::DO))
             error("'do' después de la condición del 'while'");
@@ -313,9 +316,11 @@ Stm* Parser::parseStm() {
 
     if (match(Token::DO)) {
         Body* b = parseBody();
-        match(Token::DOWHILE);
-        Exp* cond = parseCE();
-        match(Token::ENDDO);
+        if (!match(Token::DOWHILE))
+            error("'dowhile' después del cuerpo del 'do'");
+        Exp* cond = parseOE();
+        if (!match(Token::ENDDO))
+            error("'enddo' después de la condición del 'dowhile'");
         return new DoWhileStm(b, cond);
     }
 
@@ -324,7 +329,7 @@ Stm* Parser::parseStm() {
     }
 
     if (match(Token::SWITCH)) {
-        Exp* e = parseCE();
+        Exp* e = parseOE();
         SwitchStm* sw = new SwitchStm(e);
         while (match(Token::CASE)) {
             Exp* val = parseCE();
@@ -467,7 +472,7 @@ Exp* Parser::parseF() {
 
     // Expresión entre paréntesis
     if (match(Token::LPAREN)) {
-        Exp* e = parseCE();
+        Exp* e = parseOE();
         expect(Token::RPAREN);
         return e;
     }

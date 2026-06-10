@@ -34,9 +34,20 @@ static bool is_white_space(char c) {
 // -----------------------------------------------------------------------------
 
 Token* Scanner::nextToken() {
-    // Saltar espacios en blanco
-    while (current < input.length() && is_white_space(input[current]))
-        current++;
+    // Saltar espacios en blanco y comentarios de línea
+    while (current < input.length()) {
+        if (is_white_space(input[current])) {
+            current++;
+            continue;
+        }
+        if (input[current] == '/' && current + 1 < input.length() && input[current + 1] == '/') {
+            current += 2;
+            while (current < input.length() && input[current] != '\n')
+                current++;
+            continue;
+        }
+        break;
+    }
 
     // Fin de la entrada
     if (current >= input.length())
@@ -91,13 +102,19 @@ Token* Scanner::nextToken() {
         Token* token = nullptr;
         switch (c) {
             case '&':
-                if (current+1<input.length()&&input[current+1] == '&') {
-                    token = new Token(Token::AND,input,first,current+1-first);
+                if (current + 1 < input.length() && input[current+1] == '&') {
+                    current++;
+                    token = new Token(Token::AND, input, first, current + 1 - first);
+                } else {
+                    token = new Token(Token::ERR, c);
                 }
                 break;
             case '|':
-                if (current+1<input.length()&&input[current+1] == '|') {
-                    token = new Token(Token::OR,input,first,current+1-first);
+                if (current + 1 < input.length() && input[current+1] == '|') {
+                    current++;
+                    token = new Token(Token::OR, input, first, current + 1 - first);
+                } else {
+                    token = new Token(Token::ERR, c);
                 }
                 break;
             case '+': token = new Token(Token::PLUS,   c); break;
