@@ -1,17 +1,12 @@
 fun int main()
-    var int x, result;
-    x = 0;
+    var int i;
+    i = 0;
     dowhile
-        print(x);
-        x = x + 1
-    enddo x < 5;
-    switch x
-        case 5,
-            result = 100
-        case 10,
-            result = 200
-        default,
-            result = 0
-    endswitch;
+        print(i);
+        i = i + 1;
+        if i == 3 then
+            break
+        endif;
+    enddo i < 5;
     return(0)
 endfun

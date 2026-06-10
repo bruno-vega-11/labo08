@@ -524,6 +524,7 @@ int GenCodeVisitor::visit(DoWhileStm* s) {
 // -----------------------------------------------------------------------------
 
 int GenCodeVisitor::visit(SwitchStm* s) {
+    std::cerr << "[GenCode] visit SwitchStm\n";
     int swlbl = labelcont++;
 
     // Evaluar expresión switch y guardarla en %r10

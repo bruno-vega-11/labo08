@@ -217,7 +217,8 @@ Body* Parser::parseBody() {
     auto isStmStart = [&]() {
         return check(Token::ID)     || check(Token::PRINT)  ||
                check(Token::RETURN) || check(Token::IF)     ||
-               check(Token::WHILE);
+               check(Token::WHILE) || check(Token::DOWHILE) ||
+               check(Token::BREAK)  || check(Token::SWITCH);
     };
 
     // Al menos un statement
@@ -366,24 +367,41 @@ Exp* Parser::parseOE() {
     return l;
 }
 
-// CE → BE ('<' BE)?
+// CE → BE ( ('<' | '>' | '<=' | '>=' | '==' | '!=') BE )*
 Exp* Parser::parseCE() {
     Exp* l = parseBE();
-    if (match(Token::LE)) {
-        Exp* r = parseBE();
-        l = new BinaryExp(l, r, LE_OP);
-    }
-    if (match(Token::GE)) {
-        Exp* r = parseBE();
-        l = new BinaryExp(l, r, GE_OP);
-    }
-    if (match(Token::LEQ)) {
-        Exp* r = parseBE();
-        l = new BinaryExp(l, r, LEQ_OP);
-    }
-    if (match(Token::GER)) {
-        Exp* r = parseBE();
-        l = new BinaryExp(l, r, GEQ_OP);
+    while (true) {
+        if (match(Token::LE)) {
+            Exp* r = parseBE();
+            l = new BinaryExp(l, r, LE_OP);
+            continue;
+        }
+        if (match(Token::GE)) {
+            Exp* r = parseBE();
+            l = new BinaryExp(l, r, GE_OP);
+            continue;
+        }
+        if (match(Token::LEQ)) {
+            Exp* r = parseBE();
+            l = new BinaryExp(l, r, LEQ_OP);
+            continue;
+        }
+        if (match(Token::GER)) {
+            Exp* r = parseBE();
+            l = new BinaryExp(l, r, GEQ_OP);
+            continue;
+        }
+        if (match(Token::EQ)) {
+            Exp* r = parseBE();
+            l = new BinaryExp(l, r, EQ_OP);
+            continue;
+        }
+        if (match(Token::NEQ)) {
+            Exp* r = parseBE();
+            l = new BinaryExp(l, r, NEQ_OP);
+            continue;
+        }
+        break;
     }
     return l;
 }

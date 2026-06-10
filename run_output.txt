@@ -1,0 +1,3 @@
+Parser exitoso
+Generando código ensamblador en 'inputs/input3.s'...
+Compilación exitosa.

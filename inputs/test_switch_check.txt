@@ -1,0 +1,15 @@
+fun int main()
+    var int v, out;
+    v = 10;
+    switch v
+        case 5,
+            out = 50
+        case 10,
+            out = 100
+            break
+        default,
+            out = 0
+    endswitch;
+    print(out);
+    return(0)
+endfun
