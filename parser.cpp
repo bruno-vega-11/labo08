@@ -311,10 +311,11 @@ Stm* Parser::parseStm() {
         return new WhileStm(cond, b);
     }
 
-    if (match(Token::DOWHILE)) {
+    if (match(Token::DO)) {
         Body* b = parseBody();
-        match(Token::ENDDO);
+        match(Token::DOWHILE);
         Exp* cond = parseCE();
+        match(Token::ENDDO);
         return new DoWhileStm(b, cond);
     }
 

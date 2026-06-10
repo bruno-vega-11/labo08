@@ -82,16 +82,24 @@ Token* Scanner::nextToken() {
         if (lexema == "default")  return new Token(Token::DEFAULT, input,first,current-first);
         if (lexema == "break")  return new Token(Token::BREAK, input,first,current-first);
         if (lexema == "endswitch")  return new Token(Token::ENDSWITCH, input,first,current-first);
-        if (lexema == "and")  return new Token(Token::AND, input,first,current-first);
-        if (lexema == "or")  return new Token(Token::OR, input,first,current-first);
         if (lexema == "not")  return new Token(Token::NOT, input,first,current-first);
         return new Token(Token::ID, input, first, current - first);
     }
 
     // ---- Operadores y delimitadores ----
-    if (strchr("+-*/();=,<>!", c)) {
+    if (strchr("+-*/();=,<>!&|", c)) {
         Token* token = nullptr;
         switch (c) {
+            case '&':
+                if (current+1<input.length()&&input[current+1] == '&') {
+                    token = new Token(Token::AND,input,first,current+1-first);
+                }
+                break;
+            case '|':
+                if (current+1<input.length()&&input[current+1] == '|') {
+                    token = new Token(Token::OR,input,first,current+1-first);
+                }
+                break;
             case '+': token = new Token(Token::PLUS,   c); break;
             case '-': token = new Token(Token::MINUS,  c); break;
             case '/': token = new Token(Token::DIV,    c); break;
