@@ -49,6 +49,7 @@ public:
     VarDec*  parseVarDec();
     Stm*     parseStm();
     Exp*     parseOE();
+    Exp*     parseAE();
     Exp*     parseCE();     // Comparison Expression: BE ('<' BE)?
     Exp*     parseBE();     // Binary Expression: E (('+' | '-') E)*
     Exp*     parseE();      // Expression: T (('*' | '/') T)*
