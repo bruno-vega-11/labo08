@@ -18,10 +18,10 @@ while_0:
  popq %rax
  cmpq %rcx, %rax
  movq $0, %rax
- setle %al
+ setl %al
  movzbq %al, %rax
  cmpq $0, %rax
- je endwhile_0
+ je endlbl_0
  movq -8(%rbp), %rax
  movq %rax, %rsi
  leaq print_fmt(%rip), %rdi
@@ -35,7 +35,7 @@ while_0:
  addq %rcx, %rax
  movq %rax, -8(%rbp)
  jmp while_0
-endwhile_0:
+endlbl_0:
  movq $0, %rax
  jmp .end_main
 .end_main:

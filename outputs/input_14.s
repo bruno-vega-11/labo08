@@ -16,7 +16,7 @@ fib:
  popq %rax
  cmpq %rcx, %rax
  movq $0, %rax
- setle %al
+ setl %al
  movzbq %al, %rax
  cmpq $0, %rax
  je else_0
@@ -65,10 +65,10 @@ while_1:
  popq %rax
  cmpq %rcx, %rax
  movq $0, %rax
- setle %al
+ setl %al
  movzbq %al, %rax
  cmpq $0, %rax
- je endwhile_1
+ je endlbl_1
  movq -8(%rbp), %rax
  movq %rax, %rsi
  leaq print_fmt(%rip), %rdi
@@ -89,7 +89,7 @@ while_1:
  addq %rcx, %rax
  movq %rax, -8(%rbp)
  jmp while_1
-endwhile_1:
+endlbl_1:
  movq $0, %rax
  jmp .end_main
 .end_main:

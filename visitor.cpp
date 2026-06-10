@@ -254,6 +254,37 @@ int TypeCheckerVisitor::visit(BinaryExp* exp) {
 int TypeCheckerVisitor::visit(NumberExp* exp) { return 0; }
 int TypeCheckerVisitor::visit(Program* p)     { return 0; }
 
+int TypeCheckerVisitor::visit(UnaryExp* e) {
+    if (e && e->e) e->e->accept(this);
+    return 0;
+}
+
+int TypeCheckerVisitor::visit(BreakStm* s) {
+    // Nothing to check here; semantics of 'break' handled in codegen
+    return 0;
+}
+
+int TypeCheckerVisitor::visit(DoWhileStm* s) {
+    s->b->accept(this);
+    if (s->condition) s->condition->accept(this);
+    return 0;
+}
+
+int TypeCheckerVisitor::visit(SwitchStm* s) {
+    if (s->e) s->e->accept(this);
+    for (auto c : s->cases) {
+        if (c->value) c->value->accept(this);
+        if (c->body) c->body->accept(this);
+    }
+    return 0;
+}
+
+int TypeCheckerVisitor::visit(CaseStm* c) {
+    if (c->value) c->value->accept(this);
+    if (c->body) c->body->accept(this);
+    return 0;
+}
+
 // =============================================================================
 // GenCodeVisitor — Generación de código ensamblador x86-64 (AT&T syntax)
 // =============================================================================
@@ -368,13 +399,180 @@ int GenCodeVisitor::visit(BinaryExp* exp) {
             out << " cqto\n";           // sign-extend %rax → %rdx:%rax
             out << " idivq %rcx\n";     // cociente en %rax
             break;
+        case POW_OP:
+            // Simple pow: repeated multiplication (ineficiente)
+            // Implement as result = 1; for(i=0;i<right;i++) result *= left;
+            out << " movq %rax, %r11\n"; // base in r11
+            out << " movq %rcx, %r12\n"; // exp in r12
+            out << " movq $1, %rax\n";   // result
+            out << " testq %r12, %r12\n";
+            out << " jz .pow_done_" << labelcont << "\n";
+            out << ".pow_loop_" << labelcont << ":\n";
+            out << " imulq %r11, %rax\n";
+            out << " decq %r12\n";
+            out << " jnz .pow_loop_" << labelcont << "\n";
+            out << ".pow_done_" << labelcont << ":\n";
+            labelcont++;
+            break;
         case LE_OP:
+            out << " cmpq %rcx, %rax\n";
+            out << " movq $0, %rax\n";
+            out << " setl %al\n";
+            out << " movzbq %al, %rax\n";
+            break;
+        case GE_OP:
+            out << " cmpq %rcx, %rax\n";
+            out << " movq $0, %rax\n";
+            out << " setg %al\n";
+            out << " movzbq %al, %rax\n";
+            break;
+        case LEQ_OP:
             out << " cmpq %rcx, %rax\n";
             out << " movq $0, %rax\n";
             out << " setle %al\n";
             out << " movzbq %al, %rax\n";
             break;
+        case GEQ_OP:
+            out << " cmpq %rcx, %rax\n";
+            out << " movq $0, %rax\n";
+            out << " setge %al\n";
+            out << " movzbq %al, %rax\n";
+            break;
+        case EQ_OP:
+            out << " cmpq %rcx, %rax\n";
+            out << " movq $0, %rax\n";
+            out << " sete %al\n";
+            out << " movzbq %al, %rax\n";
+            break;
+        case NEQ_OP:
+            out << " cmpq %rcx, %rax\n";
+            out << " movq $0, %rax\n";
+            out << " setne %al\n";
+            out << " movzbq %al, %rax\n";
+            break;
+        case AND_OP:
+            // left in %rax, right in %rcx -> normalize to 0/1 then and
+            out << " cmpq $0, %rax\n";
+            out << " setne %al\n";
+            out << " movzbq %al, %rax\n";
+            out << " cmpq $0, %rcx\n";
+            out << " setne %cl\n";
+            out << " movzbq %cl, %rcx\n";
+            out << " andq %rcx, %rax\n";
+            break;
+        case OR_OP:
+            out << " cmpq $0, %rax\n";
+            out << " setne %al\n";
+            out << " movzbq %al, %rax\n";
+            out << " cmpq $0, %rcx\n";
+            out << " setne %cl\n";
+            out << " movzbq %cl, %rcx\n";
+            out << " orq %rcx, %rax\n";
+            break;
     }
+    return 0;
+}
+
+// -----------------------------------------------------------------------------
+// visit(UnaryExp) — negación lógica
+// -----------------------------------------------------------------------------
+
+int GenCodeVisitor::visit(UnaryExp* e) {
+    e->e->accept(this);
+    out << " cmpq $0, %rax\n";
+    out << " movq $0, %rax\n";
+    out << " sete %al\n";
+    out << " movzbq %al, %rax\n";
+    return 0;
+}
+
+// -----------------------------------------------------------------------------
+// visit(BreakStm)
+// -----------------------------------------------------------------------------
+
+int GenCodeVisitor::visit(BreakStm* s) {
+    if (breaktargets.empty()) {
+        throw std::runtime_error("[GenCode] 'break' fuera de un contexto de bucle/switch");
+    }
+    int lbl = breaktargets.back();
+    out << " jmp endlbl_" << lbl << "\n";
+    return 0;
+}
+
+// -----------------------------------------------------------------------------
+// visit(DoWhileStm)
+// -----------------------------------------------------------------------------
+
+int GenCodeVisitor::visit(DoWhileStm* s) {
+    int lbl = labelcont++;
+    // marcar destino de break
+    breaktargets.push_back(lbl);
+
+    out << "do_" << lbl << ":\n";
+    s->b->accept(this);
+    s->condition->accept(this);
+    out << " cmpq $0, %rax\n";
+    out << " jne do_" << lbl << "\n";
+    out << "endlbl_" << lbl << ":\n";
+
+    breaktargets.pop_back();
+    return 0;
+}
+
+// -----------------------------------------------------------------------------
+// visit(SwitchStm) and visit(CaseStm)
+// -----------------------------------------------------------------------------
+
+int GenCodeVisitor::visit(SwitchStm* s) {
+    int swlbl = labelcont++;
+
+    // Evaluar expresión switch y guardarla en %r10
+    s->e->accept(this);
+    out << " movq %rax, %r10\n";
+
+    // Preparar etiquetas para cada case
+    std::vector<int> caselabs;
+    int defaultLab = -1;
+    for (auto c : s->cases) {
+        int id = labelcont++;
+        caselabs.push_back(id);
+        if (c->value == nullptr) defaultLab = id;
+    }
+
+    // Comparar y saltar a la etiqueta correspondiente
+    for (size_t i = 0; i < s->cases.size(); ++i) {
+        CaseStm* c = s->cases[i];
+        if (c->value) {
+            c->value->accept(this);
+            out << " cmpq %rax, %r10\n";
+            out << " je case_" << caselabs[i] << "\n";
+        }
+    }
+
+    // Si hay default, saltar a default, si no, ir al fin
+    if (defaultLab != -1) {
+        out << " jmp case_" << defaultLab << "\n";
+    } else {
+        out << " jmp endlbl_" << swlbl << "\n";
+    }
+
+    // Emitir cuerpos de casos
+    for (size_t i = 0; i < s->cases.size(); ++i) {
+        int id = caselabs[i];
+        out << "case_" << id << ":\n";
+        // marcar destino de break
+        breaktargets.push_back(swlbl);
+        s->cases[i]->body->accept(this);
+        breaktargets.pop_back();
+        out << " jmp endlbl_" << swlbl << "\n"; // evitar fallthrough
+    }
+
+    out << "endlbl_" << swlbl << ":\n";
+    return 0;
+}
+
+int GenCodeVisitor::visit(CaseStm* c) {
+    // No se usa directamente; los cases se procesan desde visit(SwitchStm)
     return 0;
 }
 
@@ -439,13 +637,18 @@ int GenCodeVisitor::visit(IfStm* stm) {
 
 int GenCodeVisitor::visit(WhileStm* stm) {
     int lbl = labelcont++;
+    // marcar destino de break
+    breaktargets.push_back(lbl);
+
     out << "while_" << lbl << ":\n";
     stm->condition->accept(this);
     out << " cmpq $0, %rax\n";
-    out << " je endwhile_" << lbl << "\n";
+    out << " je endlbl_" << lbl << "\n";
     stm->b->accept(this);
     out << " jmp while_" << lbl << "\n";
-    out << "endwhile_" << lbl << ":\n";
+    out << "endlbl_" << lbl << ":\n";
+
+    breaktargets.pop_back();
     return 0;
 }
 

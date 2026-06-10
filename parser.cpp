@@ -347,16 +347,21 @@ Stm* Parser::parseStm() {
 // =============================================================================
 // Reglas de expresiones (precedencia ascendente)
 // =============================================================================
-// OE → CE ('and' | 'or' CE)?
+// OE → CE ( 'and' CE | 'or' CE )*
 Exp* Parser::parseOE() {
-    Exp* l = parseBE();
-    if (match(Token::AND)) {
-        Exp* r = parseBE();
-        l = new BinaryExp(l, r, AND_OP);
-    }
-    if (match(Token::OR)) {
-        Exp* r = parseBE();
-        l = new BinaryExp(l, r, OR_OP);
+    Exp* l = parseCE();
+    while (true) {
+        if (match(Token::AND)) {
+            Exp* r = parseCE();
+            l = new BinaryExp(l, r, AND_OP);
+            continue;
+        }
+        if (match(Token::OR)) {
+            Exp* r = parseCE();
+            l = new BinaryExp(l, r, OR_OP);
+            continue;
+        }
+        break;
     }
     return l;
 }
@@ -426,6 +431,18 @@ Exp* Parser::parseF() {
         return new NumberExp(1);
     if (match(Token::FALSE))
         return new NumberExp(0);
+
+    // Negación lógica (unario 'not')
+    if (match(Token::NOT)) {
+        Exp* sub = parseF();
+        return new UnaryExp(sub);
+    }
+
+    // Unary minus: transform into 0 - F
+    if (match(Token::MINUS)) {
+        Exp* sub = parseF();
+        return new BinaryExp(new NumberExp(0), sub, MINUS_OP);
+    }
 
     // Expresión entre paréntesis
     if (match(Token::LPAREN)) {

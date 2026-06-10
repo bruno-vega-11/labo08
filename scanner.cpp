@@ -89,7 +89,7 @@ Token* Scanner::nextToken() {
     }
 
     // ---- Operadores y delimitadores ----
-    if (strchr("+/-*();=<,", c)) {
+    if (strchr("+-*/();=,<>!", c)) {
         Token* token = nullptr;
         switch (c) {
             case '+': token = new Token(Token::PLUS,   c); break;
@@ -118,10 +118,9 @@ Token* Scanner::nextToken() {
             case '>':
                 if (current + 1 < input.length() && input[current+1] == '=') {
                     current++;
-                    token = new Token(Token::GE,input,first,current+1 -first);
+                    token = new Token(Token::GER,input,first,current+1 -first);
                 } else {
                     token = new Token(Token::GE,     c); break;
-
                 }
                 break;
             case '<':
