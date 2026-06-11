@@ -129,14 +129,15 @@ public:
     // Mapa variable local → offset desde %rbp
     std::unordered_map<std::string, int> memoria;
 
-    // Vector rarito
-    std::vector<int> breaktargets;
+    // Vector rarito para las etiques de los breaks
+    std::vector<std::string> breaktargets;
 
     // Conjunto de variables globales
     std::unordered_map<std::string, bool> memoriaGlobal;
 
-    int  offset        = -8;    // Próximo offset disponible en el frame local
-    int  labelcont     = 0;     // Contador de etiquetas únicas para if/while
+    int  offset        = -8;     // Próximo offset disponible en el frame local
+    int  labelcont     = 0;      // Contador de etiquetas únicas para if/while
+    int  notlabelcont  = 1;      // Contador de etiquetas únicas para not
     bool entornoFuncion = false; // ¿Estamos dentro de una función?
     std::string nombreFuncion;  // Nombre de la función actual
 

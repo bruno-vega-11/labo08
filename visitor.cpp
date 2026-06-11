@@ -451,22 +451,10 @@ int GenCodeVisitor::visit(BinaryExp* exp) {
             out << " movzbq %al, %rax\n";
             break;
         case AND_OP:
-            // left in %rax, right in %rcx -> normalize to 0/1 then and
-            out << " cmpq $0, %rax\n";
-            out << " setne %al\n";
-            out << " movzbq %al, %rax\n";
-            out << " cmpq $0, %rcx\n";
-            out << " setne %cl\n";
-            out << " movzbq %cl, %rcx\n";
+            // left in %rax, right in %rcx
             out << " andq %rcx, %rax\n";
             break;
         case OR_OP:
-            out << " cmpq $0, %rax\n";
-            out << " setne %al\n";
-            out << " movzbq %al, %rax\n";
-            out << " cmpq $0, %rcx\n";
-            out << " setne %cl\n";
-            out << " movzbq %cl, %rcx\n";
             out << " orq %rcx, %rax\n";
             break;
     }
@@ -479,10 +467,21 @@ int GenCodeVisitor::visit(BinaryExp* exp) {
 
 int GenCodeVisitor::visit(UnaryExp* e) {
     e->e->accept(this);
-    out << " cmpq $0, %rax\n";
-    out << " movq $0, %rax\n";
-    out << " sete %al\n";
-    out << " movzbq %al, %rax\n";
+
+    int id = labelcont++;
+    switch (e->op) {
+        case NOT_OP:
+            out << " cmpq $0, %rax\n";
+            out << " je not_true_" << id << "\n";
+            out << " movq $0, %rax\n";
+            out << " jmp not_end_" << id << "\n";
+            out << "not_true_" << id << ":\n";
+            out << " movq $1, %rax\n";
+            out << "not_end_" << id << ":\n";
+            break;
+        default:
+            out << "xDDDDDDDDDDDDDDd" << "\n";
+    }
     return 0;
 }
 
@@ -494,8 +493,8 @@ int GenCodeVisitor::visit(BreakStm* s) {
     if (breaktargets.empty()) {
         throw std::runtime_error("[GenCode] 'break' fuera de un contexto de bucle/switch");
     }
-    int lbl = breaktargets.back();
-    out << " jmp endlbl_" << lbl << "\n";
+    std::string lbl = breaktargets.back();
+    out << " jmp " << lbl << "\n";
     return 0;
 }
 
@@ -505,15 +504,16 @@ int GenCodeVisitor::visit(BreakStm* s) {
 
 int GenCodeVisitor::visit(DoWhileStm* s) {
     int lbl = labelcont++;
+    std::string endDoWhileLabel = "endwhile_" + std::to_string(lbl);
     // marcar destino de break
-    breaktargets.push_back(lbl);
+    breaktargets.push_back(endDoWhileLabel);
 
-    out << "do_" << lbl << ":\n";
+    out << "dowhile_" << lbl << ":\n";
     s->b->accept(this);
     s->condition->accept(this);
     out << " cmpq $0, %rax\n";
-    out << " jne do_" << lbl << "\n";
-    out << "endlbl_" << lbl << ":\n";
+    out << " jne dowhile_" << lbl << "\n";
+    out << endDoWhileLabel << ":\n";
 
     breaktargets.pop_back();
     return 0;
@@ -526,54 +526,59 @@ int GenCodeVisitor::visit(DoWhileStm* s) {
 int GenCodeVisitor::visit(SwitchStm* s) {
     std::cerr << "[GenCode] visit SwitchStm\n";
     int swlbl = labelcont++;
+    std::string endSwitchLabel = "endswitch_" + std::to_string(swlbl);
 
     // Evaluar expresión switch y guardarla en %r10
     s->e->accept(this);
     out << " movq %rax, %r10\n";
 
-    // Preparar etiquetas para cada case
-    std::vector<int> caselabs;
-    int defaultLab = -1;
-    for (auto c : s->cases) {
-        int id = labelcont++;
-        caselabs.push_back(id);
-        if (c->value == nullptr) defaultLab = id;
-    }
+    // default node
+    CaseStm* defaultNode = nullptr;
 
-    // Comparar y saltar a la etiqueta correspondiente
-    for (size_t i = 0; i < s->cases.size(); ++i) {
-        CaseStm* c = s->cases[i];
-        if (c->value) {
+    for (auto c : s->cases) {
+        if (c->value != nullptr) {
+            NumberExp* numExp = dynamic_cast<NumberExp*>(c->value);
+            int val = numExp ? numExp->value : 0;
+
             c->value->accept(this);
             out << " cmpq %rax, %r10\n";
-            out << " je case_" << caselabs[i] << "\n";
+            out << " je case_" << swlbl << "_" << val << "\n";
+        } else {
+            defaultNode = c;
         }
     }
 
-    // Si hay default, saltar a default, si no, ir al fin
-    if (defaultLab != -1) {
-        out << " jmp case_" << defaultLab << "\n";
+    if (defaultNode != nullptr) {
+        out << " jmp default_" << swlbl << "\n";
     } else {
-        out << " jmp endlbl_" << swlbl << "\n";
+        out << " jmp " << endSwitchLabel << "\n";
     }
 
-    // Emitir cuerpos de casos
-    for (size_t i = 0; i < s->cases.size(); ++i) {
-        int id = caselabs[i];
-        out << "case_" << id << ":\n";
-        // marcar destino de break
-        breaktargets.push_back(swlbl);
-        s->cases[i]->body->accept(this);
-        breaktargets.pop_back();
-        out << " jmp endlbl_" << swlbl << "\n"; // evitar fallthrough
+    breaktargets.push_back(endSwitchLabel);
+    for (auto c:s->cases) {
+        if (c->value != nullptr) {
+            NumberExp* numExp = dynamic_cast<NumberExp*>(c->value);
+            int val = numExp ? numExp->value : 0;
+
+            out << "case_" << swlbl << "_" << val << ":\n";
+            c->body->accept(this);
+            out << " jmp " << endSwitchLabel << "\n";
+        }
+    }
+    out << "default_" << swlbl << ":\n";
+    if (defaultNode != nullptr) {
+        defaultNode->body->accept(this);
     }
 
-    out << "endlbl_" << swlbl << ":\n";
+    // Etiqueta de salida oficial del switch
+    out << endSwitchLabel << ":\n";
+
+    // Quitamos el objetivo del break de la pila
+    breaktargets.pop_back();
     return 0;
 }
 
 int GenCodeVisitor::visit(CaseStm* c) {
-    // No se usa directamente; los cases se procesan desde visit(SwitchStm)
     return 0;
 }
 
@@ -639,15 +644,16 @@ int GenCodeVisitor::visit(IfStm* stm) {
 int GenCodeVisitor::visit(WhileStm* stm) {
     int lbl = labelcont++;
     // marcar destino de break
-    breaktargets.push_back(lbl);
+    std::string endWhileLabel = "endwhile_" + std::to_string(lbl);
+    breaktargets.push_back(endWhileLabel);
 
     out << "while_" << lbl << ":\n";
     stm->condition->accept(this);
     out << " cmpq $0, %rax\n";
-    out << " je endlbl_" << lbl << "\n";
+    out << " je " << endWhileLabel << "\n";
     stm->b->accept(this);
     out << " jmp while_" << lbl << "\n";
-    out << "endlbl_" << lbl << ":\n";
+    out << endWhileLabel << ":\n";
 
     breaktargets.pop_back();
     return 0;

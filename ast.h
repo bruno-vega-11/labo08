@@ -54,6 +54,10 @@ enum BinaryOp {
     OR_OP,      // or
 };
 
+enum UnaryOp {
+    NOT_OP      // !
+};
+
 // =============================================================================
 // Expresiones
 // =============================================================================
@@ -79,7 +83,8 @@ public:
 class UnaryExp: public Exp {
 public:
     Exp* e;
-    UnaryExp(Exp* _e):e(_e){};
+    UnaryOp op;
+    UnaryExp(Exp* _e,UnaryOp _op):e(_e),op(_op){};
     int accept(Visitor *visitor) override;
     ~UnaryExp(){};
 };

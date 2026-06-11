@@ -467,7 +467,7 @@ Exp* Parser::parseF() {
     // Negación lógica (unario 'not')
     if (match(Token::NOT)) {
         Exp* sub = parseF();
-        return new UnaryExp(sub);
+        return new UnaryExp(sub,UnaryOp::NOT_OP);
     }
 
     // Expresión entre paréntesis
